@@ -5,6 +5,7 @@ from tkinter import *
 import argparse
 import time
 import linuxcnc
+import hal
 
 root = Tk()
 
@@ -14,10 +15,13 @@ class lc():
         try:
             self.s = linuxcnc.stat()
             self.s.poll()
+            self.c = linuxcnc.command()
+            self.h = hal.component("yadro")
+            for p in range(params['naxes']):
+                self.h.newpin(str(p), hal.HAL_FLOAT, hal.HAL_IN)
+            self.h.ready()
         except:
             exit(1)
-        self.g5x_index = getattr(self.s, "g5x_index")
-        self.c = linuxcnc.command()
         
     def send_mdi(self, s):
         print("send_mdi:", s)
@@ -35,8 +39,17 @@ class lc():
         
     def get_g5x_index(self):
         self.s.poll()
+        # print("actual_position:", self.s.actual_position)
+        # print("g5x_index:", self.s.g5x_index)
+        # print("g5x_offset:", self.s.g5x_offset)
+        # print("g93_offset:", self.s.g92_offset)
         # print("get_g5x_index:", self.s.g5x_index)
         return self.s.g5x_index
+
+    def get_pins(self):
+        pins = [self.h[str(p)] for p in range(params['naxes'])]
+        print("pins:", pins)
+        return pins
 
 # One of these for each DRO row
 class axis_row_gui():
@@ -114,11 +127,10 @@ class main_gui():
         self.lcnc.send_mdi(self.coord_sys[self.rb_var.get()])
 
     def poll(self):
-        self.rb_var.set(lcnc.get_g5x_index()-1)
-        return
-        self.row_info[0].set_value(str(0.0))
-        self.row_info[1].set_value(str(1.0))
-        self.row_info[2].set_value(str(1.0))
+        self.rb_var.set(self.lcnc.get_g5x_index()-1)
+        pins = self.lcnc.get_pins()
+        for i in range(len(pins)):
+            self.row_info[i].set_value(pins[i])
 
 def call_polls():
     global gui
@@ -136,7 +148,7 @@ if __name__ == '__main__':
     axes = list(args.axes)
 
     params = {}
-    params["naxis"] = len(axes)
+    params["naxes"] = len(axes)
     params["axes"] = axes
     params["verbose"] = args.verbose
     params["font1"] = ("Helvetica", 30)
