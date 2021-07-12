@@ -32,7 +32,7 @@ class lc():
         
     def get_g5x_index(self):
         self.s.poll()
-        print("get_g5x_index:", self.s.g5x_index)
+        # print("get_g5x_index:", self.s.g5x_index)
         return self.s.g5x_index
 
 # One of these for each DRO row
@@ -85,7 +85,7 @@ class main_gui():
         px = 5
         font = ("Helvetica", 15)
 
-        root.title("tst")
+        root.title("yadro")
         self.f1 = Frame(root)
         self.f1.pack(padx=15, pady=15)
         self.row_info = dict()
@@ -96,7 +96,7 @@ class main_gui():
         self.f2 = Frame(root)
         self.f2.pack(padx=15, pady=15)
         self.rb_var = IntVar()
-        self.rb_var.set(lcnc.get_g5x_index())
+        self.rb_var.set(lcnc.get_g5x_index()-1)
         self.coord_sys = ['G54', 'G55', 'G56', 'G57', 'G58', 'G59', 'G59.1', 'G59.2', 'G59.3']
         for col, cs in enumerate(self.coord_sys):
             rb = Radiobutton(self.f2, text=cs, variable=self.rb_var, value=col, width=6,
@@ -105,14 +105,16 @@ class main_gui():
 
     def entry_callback(self, row, value):
         print("Entry callback", row, value)
-        self.row_info[row].set_value(value)
+        axis_name = self.row_info[row].text
+        self.lcnc.send_mdi("G10 L20 P{} {}{}".format(row, axis_name, value))
+        # self.row_info[row].set_value(value)
 
     def rb_callback(self):
         print("rb_callback", self.rb_var.get())
         self.lcnc.send_mdi(self.coord_sys[self.rb_var.get()])
 
     def poll(self):
-        self.rb_var.set(lcnc.get_g5x_index())
+        self.rb_var.set(lcnc.get_g5x_index()-1)
         return
         self.row_info[0].set_value(str(0.0))
         self.row_info[1].set_value(str(1.0))
