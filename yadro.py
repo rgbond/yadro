@@ -26,6 +26,9 @@ class lc():
             self.s.enabled and
             self.s.homed and
             (self.s.interp_state == linuxcnc.INTERP_IDLE)):
+            if not self.s.task_mode == linuxcnc.MODE_MDI:
+                self.c.mode(linuxcnc.MODE_MDI)
+                self.c.wait_complete()
             self.c.mdi(s)
         else:
             print("can't send", s)
@@ -38,26 +41,24 @@ class lc():
 # One of these for each DRO row
 class axis_row_gui():
     def __init__(self, frame, row, text, callback):
-        f = ("Helvetica", 30)
-        f1 = ("Helvetica", 15)
         px = 10
         self.row = row
         self.text = text
         self.value = StringVar()
-        self.value.set("{:.4f}".format(0.0))
+        self.value.set(params["inch_format"].format(0.0))
         self.callback = callback
-        self.title = Label(frame, justify=RIGHT, anchor=E, text=text, font=f)
+        self.title = Label(frame, justify=RIGHT, anchor=E, text=text, font=params["font1"])
         self.title.grid(row=row, column=0, columnspan=1, sticky=W)
         self.vlabel = Label(frame, width=10, justify=RIGHT, anchor=E,
-                            textvariable=self.value, font=f)
+                            textvariable=self.value, font=params["font1"])
         self.vlabel.grid(row=row, column=1, columnspan=1, sticky=W)
-        self.zero = Button(frame, text="Z", font=f1)
+        self.zero = Button(frame, text="Z", font=params["font2"])
         self.zero.bind("<ButtonRelease-1>", lambda event: self.zero_up(event))
         self.zero.grid(row=row, column=2, columnspan=1, padx=px, sticky=W)
-        self.half = Button(frame, text="1/2", font=f1)
+        self.half = Button(frame, text="1/2", font=params["font2"])
         self.half.bind("<ButtonRelease-1>", lambda event: self.half_up(event))
         self.half.grid(row=row, column=3, columnspan=1, padx=px, sticky=W)
-        self.entry = Entry(frame, width=10, justify=RIGHT, font=f)
+        self.entry = Entry(frame, width=10, justify=RIGHT, font=params["font1"])
         self.entry.bind("<Return>", lambda event: self.enter_hit())
         self.entry.grid(row=row, column=4, columnspan=1, sticky=W, padx=px)
 
@@ -75,15 +76,13 @@ class axis_row_gui():
         self.callback(self.row, float(self.value.get())/2.0)
 
     def set_value(self, v):
-        self.value.set("{:.4f}".format(v))
+        self.value.set(params["inch_format"].format(v))
 
 class main_gui():
-    def __init__(self, params, lcnc):
-        self.params = params
+    def __init__(self, lcnc):
         self.lcnc = lcnc
 
         px = 5
-        font = ("Helvetica", 15)
 
         root.title("yadro")
         self.f1 = Frame(root)
@@ -100,7 +99,8 @@ class main_gui():
         self.coord_sys = ['G54', 'G55', 'G56', 'G57', 'G58', 'G59', 'G59.1', 'G59.2', 'G59.3']
         for col, cs in enumerate(self.coord_sys):
             rb = Radiobutton(self.f2, text=cs, variable=self.rb_var, value=col, width=6,
-                             indicatoron=0, command=lambda: self.rb_callback(), font=font)
+                             indicatoron=0, command=lambda: self.rb_callback(),
+                             font=params["font2"])
             rb.grid(row=0, column=col, columnspan=1, padx=px)
 
     def entry_callback(self, row, value):
@@ -139,9 +139,12 @@ if __name__ == '__main__':
     params["naxis"] = len(axes)
     params["axes"] = axes
     params["verbose"] = args.verbose
+    params["font1"] = ("Helvetica", 30)
+    params["font2"] = ("Helvetica", 15)
+    params["inch_format"] = "{:.4f}"
 
     lcnc = lc()
-    gui = main_gui(params, lcnc)
+    gui = main_gui(lcnc)
 
     root.after(20, call_polls);
     root.mainloop()
