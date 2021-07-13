@@ -30,12 +30,19 @@ class lc():
     def poll(self):
         self.s.poll()
 
+    def is_homed(self):
+        mask = 0
+        for i in range(len(self.s.homed)):
+            if self.s.homed[i] != 0:
+                mask |= (1 << i)
+        return mask == self.s.axis_mask
+
     def send_mdi(self, s):
         if params["verbose"]:
             print("send_mdi:", s)
         if (not self.s.estop and
             self.s.state == linuxcnc.STATE_ON > 0 and
-            self.s.homed and
+            self.is_homed() and
             (self.s.interp_state == linuxcnc.INTERP_IDLE)):
             if not self.s.task_mode == linuxcnc.MODE_MDI:
                 self.c.mode(linuxcnc.MODE_MDI)
@@ -58,8 +65,10 @@ class lc():
         return pins
 
     def get_indicators(self):
+        if params["verbose"]:
+            print("get indicators:", self.s.estop, self.s.homed, self.s.task_state)
         estop = self.s.estop != 0
-        homed = self.s.homed == 1
+        homed = self.is_homed()
         enabled = self.s.task_state == linuxcnc.STATE_ON
         return estop, homed, enabled
 
