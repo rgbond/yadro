@@ -27,12 +27,14 @@ class lc():
         except:
             exit(1)
         
+    def poll(self):
+        self.s.poll()
+
     def send_mdi(self, s):
         if params["verbose"]:
             print("send_mdi:", s)
-        self.s.poll()
         if (not self.s.estop and
-            self.s.enabled > 0 and
+            self.s.state == linuxcnc.STATE_ON > 0 and
             self.s.homed and
             (self.s.interp_state == linuxcnc.INTERP_IDLE)):
             if not self.s.task_mode == linuxcnc.MODE_MDI:
@@ -43,7 +45,6 @@ class lc():
             print("can't send", s)
         
     def get_g5x_index(self):
-        self.s.poll()
         if params["verbose"]:
             print("g5x_index:", self.s.g5x_index)
             print("g5x_offset:", self.s.g5x_offset)
@@ -56,14 +57,19 @@ class lc():
             print("pins:", pins)
         return pins
 
+    def get_indicators(self):
+        estop = self.s.estop != 0
+        homed = self.s.homed == 1
+        enabled = self.s.task_state == linuxcnc.STATE_ON
+        return estop, homed, enabled
+
     def set_enable(self, on):
-        self.s.poll()
         if (self.s.enabled > 0) == on:
             return
         if on:
-            self.s.state(linuxcnc.STATE_ON)
+            self.c.state(linuxcnc.STATE_ON)
         else:
-            self.s.state(linuxcnc.STATE_OFF)
+            self.c.state(linuxcnc.STATE_OFF)
 
 # One of these for each DRO row
 class axis_row_gui():
@@ -108,6 +114,7 @@ class axis_row_gui():
     def set_value(self, v):
         self.value.set(params["inch_format"].format(v))
 
+# The keypad
 class keypad_gui():
     def __init__(self, frame, callback):
         self.kp_var = StringVar()
@@ -131,6 +138,41 @@ class keypad_gui():
         self.callback(self.kp_var.get())
         self.kp_var.set("")
 
+# Misc indicators, controls
+class indicator_gui():
+    def __init__(self, frame, callback):
+        px = 5
+        self.id_var = StringVar()
+        self.callback = callback
+        self.estop = Label(frame, width=8, text="Estop", font=params["font1"])
+        self.estop.grid(row=0, column=0, columnspan=1, sticky=NW)
+        self.homed = Label(frame, width=8, text="Homed", font=params["font1"])
+        self.homed.grid(row=1, column=0, columnspan=1, sticky=NW)
+        self.enabled = Button(frame, width=8, text="Enabled", font=params["font1"])
+        self.enabled.bind("<ButtonRelease-1>", lambda event: self.enabled_up(event))
+        self.enabled.grid(row=2, column=0, columnspan=1, padx=px, sticky=NW)
+
+    def enabled_up(self, event):
+        if params["verbose"]:
+            print("enabled_up")
+        self.callback()
+
+    def set_colors(self, estop, homed, enabled):
+        # print("set_colors")
+        estop_color = "green"
+        if estop:
+            estop_color = "red"
+        homed_color = "green"
+        if not homed:
+            homed_color = "red"
+        enabled_color = "green"
+        if not enabled:
+            enabled_color = "red"
+        self.estop.config(bg=estop_color)
+        self.homed.config(bg=homed_color)
+        self.enabled.config(bg=enabled_color)
+
+
 class main_gui():
     def __init__(self, lcnc):
         self.lcnc = lcnc
@@ -139,27 +181,34 @@ class main_gui():
         py = 15
 
         root.title("yadro")
-        self.f1 = Frame(root)
+        self.dro_frame = Frame(root)
         self.row_info = dict()
 
         for row, name in enumerate(params["axes"]):
-            self.row_info[row] = axis_row_gui(self.f1, row, name, self.entry_callback)
-        self.f1.grid(row=0, column=0, padx=px, pady=py)
+            self.row_info[row] = axis_row_gui(self.dro_frame, row, name, self.entry_callback)
+        self.dro_frame.grid(row=0, column=0, columnspan = 2, padx=px, pady=py, sticky=NW)
 
-        self.f2 = Frame(root)
-        self.keypad = keypad_gui(self.f2, self.keypad_callback)
-        self.f2.grid(row=1, column=0, padx=px, pady=py)
+        self.keypad_frame = Frame(root)
+        self.keypad = keypad_gui(self.keypad_frame, self.keypad_callback)
+        self.keypad_frame.grid(row=1, column=0, padx=px, pady=py, sticky=NW)
 
-        self.f3 = Frame(root)
+        self.indicator_frame = Frame(root)
+        self.indicators = indicator_gui(self.indicator_frame, self.indicator_callback)
+        self.indicator_frame.grid(row=1, column=1, padx = px, pady=py, sticky=NW)
+
+        self.coord_frame = Frame(root)
         self.rb_var = IntVar()
         self.rb_var.set(lcnc.get_g5x_index()-1)
         self.coord_sys = ['G54', 'G55', 'G56', 'G57', 'G58', 'G59', 'G59.1', 'G59.2', 'G59.3']
         for col, cs in enumerate(self.coord_sys):
-            rb = Radiobutton(self.f3, text=cs, variable=self.rb_var, value=col, width=6,
+            rb = Radiobutton(self.coord_frame, text=cs, variable=self.rb_var, value=col, width=6,
                              indicatoron=0, command=lambda: self.rb_callback(),
                              font=params["font2"])
             rb.grid(row=0, column=col, columnspan=1, padx=px)
-        self.f3.grid(row=2, column=0, padx=px, pady=py)
+        self.coord_frame.grid(row=2, column=0, columnspan = 2, padx=px, pady=py, sticky=NW)
+
+        root.grid_rowconfigure(1, weight=1)
+        root.grid_columnconfigure(1, weight=1)
 
     def entry_callback(self, row, value):
         if params["verbose"]:
@@ -171,16 +220,29 @@ class main_gui():
     def rb_callback(self):
         if params["verbose"]:
             print("rb_callback", self.rb_var.get())
+        self.lcnc.poll()
         self.lcnc.send_mdi(self.coord_sys[self.rb_var.get()])
 
     def keypad_callback(self, key):
         print("keypad_callback", key)
 
+    def indicator_callback(self):
+        print("indicator_callback")
+        self.lcnc.poll()
+        estop, homed, enabled = self.lcnc.get_indicators()
+        if enabled:
+            lcnc.set_enable(False)
+        else:
+            lcnc.set_enable(True)
+
     def poll(self):
+        self.lcnc.poll()
         self.rb_var.set(self.lcnc.get_g5x_index()-1)
         pins = self.lcnc.get_pins()
         for i in range(len(pins)):
             self.row_info[i].set_value(pins[i])
+        estop, homed, enabled = self.lcnc.get_indicators()
+        self.indicators.set_colors(estop, homed, enabled)
 
 def call_polls():
     global gui
