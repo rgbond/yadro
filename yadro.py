@@ -133,19 +133,16 @@ class keypad_gui():
     def __init__(self, frame, callback):
         self.kp_var = StringVar()
         self.callback = callback
-        rows = (7,8,9), (4,5,6), (1,2,3)
         rows = (('7','8','9'), ('4','5','6'),
-                ('1','2','3'), ('0','.','E'))
-        for row, values in enumerate(rows):
-            for col, n in enumerate(values):
-                self.add_kp_button(frame, str(n), row, col)
-
-    def add_kp_button(self, frame, b, row, col):
+                ('1','2','3'), ('0','.','-'),
+                ('C','<','E'))
         px = 5
-        rb = Radiobutton(frame, text=b, variable=self.kp_var, value=b, width=4,
-                         indicatoron=0, command=lambda: self.kp_hit(),
-                         font=params["font1"])
-        rb.grid(row=row, column=col, padx=px)
+        for row, values in enumerate(rows):
+            for col, c in enumerate(values):
+                rb = Radiobutton(frame, text=c, variable=self.kp_var, value=c, width=4,
+                                 indicatoron=0, command=lambda: self.kp_hit(),
+                                 font=params["font1"])
+                rb.grid(row=row, column=col, padx=px)
 
     def kp_hit(self):
         print("kp_hit", self.kp_var.get())
@@ -160,14 +157,14 @@ class indicator_gui():
         self.id_var = StringVar()
         self.callback = callback
         self.estop = Label(frame, width=8, text="Estop", font=params["font1"])
-        self.estop.grid(row=0, column=0, padx=px, pady=py, sticky=NW)
+        self.estop.grid(row=0, column=0, padx=px, pady=py)
         self.homed = Label(frame, width=8, text="Homed", font=params["font1"])
-        self.homed.grid(row=1, column=0, padx=px, pady=py, sticky=NW)
+        self.homed.grid(row=1, column=0, padx=px, pady=py)
         self.enabled = Label(frame, width=8, text="Enabled", font=params["font1"])
-        self.enabled.grid(row=2, column=0, padx=px, pady=py, sticky=NW)
+        self.enabled.grid(row=2, column=0, padx=px, pady=py)
         self.enable = Button(frame, width=6, text="On/Off", font=params["font1"])
         self.enable.bind("<ButtonRelease-1>", lambda event: self.enable_up(event))
-        self.enable.grid(row=3, column=0, padx=px, pady=py, sticky=NW)
+        self.enable.grid(row=3, column=0, padx=px, pady=py)
 
     def enable_up(self, event):
         if params["verbose"]:
@@ -212,7 +209,7 @@ class main_gui():
 
         self.indicator_frame = Frame(root)
         self.indicators = indicator_gui(self.indicator_frame, self.indicator_callback)
-        self.indicator_frame.grid(row=1, column=1, padx = px, pady=py, sticky=NW)
+        self.indicator_frame.grid(row=1, column=1, padx = px, pady=py, sticky=N)
 
         self.coord_frame = Frame(root)
         self.rb_var = IntVar()
@@ -257,6 +254,14 @@ class main_gui():
             return
         if key == 'E':
             self.axis_row[self.last_row].enter_hit()
+            return
+        if key == 'C':
+            self.axis_row[self.last_row].entry.delete(0, END)
+            return
+        if key == '<':
+            s = self.axis_row[self.last_row].entry.get()
+            self.axis_row[self.last_row].entry.delete(0, END)
+            self.axis_row[self.last_row].entry.insert(END, s[:-1])
             return
         self.axis_row[self.last_row].entry.insert(END, key)
 
