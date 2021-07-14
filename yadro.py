@@ -1,10 +1,4 @@
 #!/usr/bin/python3
-# log.db utility
-#
-# dump
-# print file_list
-# comment file "comment"
-# delete key
 #
 # Copyright 2021 Robert Bond
 #
