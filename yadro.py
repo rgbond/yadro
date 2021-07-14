@@ -71,18 +71,18 @@ class lc():
             print("can't send", s)
 
     def get_g5x_index(self):
-        if params["verbose"]:
+        if params["very_verbose"]:
             print("g5x_index:", self.s.g5x_index)
         return self.s.g5x_index
 
     def get_pins(self):
         pins = [self.h[str(p)] for p in range(params['naxes'])]
-        if params["verbose"]:
+        if params["very_verbose"]:
             print("pins:", pins)
         return pins
 
     def get_indicators(self):
-        if params["verbose"]:
+        if params["very_verbose"]:
             print("get indicators:", self.s.estop, self.s.homed, self.s.task_state)
         estop = self.s.estop != 0
         homed = self.is_homed()
@@ -266,6 +266,8 @@ class main_gui():
         root.grid_columnconfigure(1, weight=1)
 
     def entry_callback(self, row, value):
+        if params["verbose"]:
+            print("Entry callback", row, value)
         self.lcnc.poll()
         if not self.lcnc.is_running():
             return
@@ -277,11 +279,11 @@ class main_gui():
             self.last_row = row
             return
         # Enter
-        if params["verbose"]:
-            print("Entry callback", row, value)
         axis_name = self.axis_row[row].text
-        self.lcnc.send_mdi("G10 L20 P{} {}{}".format(row, axis_name, value))
-        self.axis_row[self.last_row].entry.config(bg='light gray')
+        g5x_index = self.lcnc.get_g5x_index()
+        self.lcnc.send_mdi("G10 L20 P{} {}{}".format(g5x_index, axis_name, value))
+        if not self.last_row is None:
+            self.axis_row[self.last_row].entry.config(bg='light gray')
         self.last_row = None
         # self.axis_row[row].set_value(value)
 
@@ -335,9 +337,9 @@ def call_polls():
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('-v', '--verbose', dest='verbose', action="store_true",
-                        help='set verbose mode')
-    parser.add_argument("axes", type=str, help="Axes (ex: XYZ)")
+    parser.add_argument('--verbose', '-v', action='count', default=0,
+                    help='Print debug info')
+    parser.add_argument("axes", type=str, help="Axes (example: XYZ)")
 
     args = parser.parse_args()
 
@@ -346,7 +348,12 @@ if __name__ == '__main__':
     params = {}
     params["naxes"] = len(axes)
     params["axes"] = axes
-    params["verbose"] = args.verbose
+    params["verbose"] = False
+    params["very_verbose"] = False
+    if args.verbose > 0:
+        params["verbose"] = True
+    if args.verbose > 1:
+        params["very_verbose"] = True
     params["font1"] = ("Helvetica", 20)
     params["font2"] = ("Helvetica", 10)
     params["inch_format"] = "{:.4f}"
