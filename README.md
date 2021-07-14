@@ -18,6 +18,7 @@ example, yadro will create these hal pins:
 I hook them up to halui like this:
 
 loadusr -W /home/rgb/src/dro/yadro.py XYZ
+
     net cposx halui.axis.x.pos-relative => yadro.0
     net cposy halui.axis.y.pos-relative => yadro.1
     net cposz halui.axis.z.pos-relative => yadro.2
