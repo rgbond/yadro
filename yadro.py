@@ -163,13 +163,15 @@ class indicator_gui():
         self.estop.grid(row=0, column=0, padx=px, pady=py, sticky=NW)
         self.homed = Label(frame, width=8, text="Homed", font=params["font1"])
         self.homed.grid(row=1, column=0, padx=px, pady=py, sticky=NW)
-        self.enabled = Button(frame, width=8, text="Enabled", font=params["font1"])
-        self.enabled.bind("<ButtonRelease-1>", lambda event: self.enabled_up(event))
+        self.enabled = Label(frame, width=8, text="Enabled", font=params["font1"])
         self.enabled.grid(row=2, column=0, padx=px, pady=py, sticky=NW)
+        self.enable = Button(frame, width=6, text="On/Off", font=params["font1"])
+        self.enable.bind("<ButtonRelease-1>", lambda event: self.enable_up(event))
+        self.enable.grid(row=3, column=0, padx=px, pady=py, sticky=NW)
 
-    def enabled_up(self, event):
+    def enable_up(self, event):
         if params["verbose"]:
-            print("enabled_up")
+            print("enable_up")
         self.callback()
 
     def set_colors(self, estop, homed, enabled):
@@ -197,11 +199,11 @@ class main_gui():
 
         root.title("yadro")
         self.dro_frame = Frame(root)
-        self.row_info = dict()
+        self.axis_row = dict()
         self.last_row = None
 
         for row, name in enumerate(params["axes"]):
-            self.row_info[row] = axis_row_gui(self.dro_frame, row, name, self.entry_callback)
+            self.axis_row[row] = axis_row_gui(self.dro_frame, row, name, self.entry_callback)
         self.dro_frame.grid(row=0, column=0, columnspan = 2, padx=px, pady=py, sticky=NW)
 
         self.keypad_frame = Frame(root)
@@ -230,18 +232,18 @@ class main_gui():
         if value is None:
             # just a click
             if not self.last_row is None:
-                self.row_info[self.last_row].entry.config(bg='light gray')
-            self.row_info[row].entry.config(bg='white')
+                self.axis_row[self.last_row].entry.config(bg='light gray')
+            self.axis_row[row].entry.config(bg='white')
             self.last_row = row
             return
-        # Enter hit
+        # Enter
         if params["verbose"]:
             print("Entry callback", row, value)
-        axis_name = self.row_info[row].text
+        axis_name = self.axis_row[row].text
         self.lcnc.send_mdi("G10 L20 P{} {}{}".format(row, axis_name, value))
-        self.row_info[self.last_row].entry.config(bg='light gray')
+        self.axis_row[self.last_row].entry.config(bg='light gray')
         self.last_row = None
-        # self.row_info[row].set_value(value)
+        # self.axis_row[row].set_value(value)
 
     def rb_callback(self):
         if params["verbose"]:
@@ -254,9 +256,9 @@ class main_gui():
         if self.last_row is None:
             return
         if key == 'E':
-            self.row_info[self.last_row].enter_hit()
+            self.axis_row[self.last_row].enter_hit()
             return
-        self.row_info[self.last_row].entry.insert(END, key)
+        self.axis_row[self.last_row].entry.insert(END, key)
 
     def indicator_callback(self):
         print("indicator_callback")
@@ -272,7 +274,7 @@ class main_gui():
         self.rb_var.set(self.lcnc.get_g5x_index()-1)
         pins = self.lcnc.get_pins()
         for i in range(len(pins)):
-            self.row_info[i].set_value(pins[i])
+            self.axis_row[i].set_value(pins[i])
         estop, homed, enabled = self.lcnc.get_indicators()
         self.indicators.set_colors(estop, homed, enabled)
 
