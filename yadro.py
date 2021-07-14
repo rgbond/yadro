@@ -36,13 +36,17 @@ class lc():
             mask |= (self.s.homed[i] << i)
         return mask == self.s.axis_mask
 
+    def is_running(self):
+        rv = (not self.s.estop and
+              self.s.task_state == linuxcnc.STATE_ON and
+              self.is_homed() and
+              (self.s.interp_state == linuxcnc.INTERP_IDLE))
+        return rv
+
     def send_mdi(self, s):
         if params["verbose"]:
             print("send_mdi:", s)
-        if (not self.s.estop and
-            self.s.task_state == linuxcnc.STATE_ON and
-            self.is_homed() and
-            (self.s.interp_state == linuxcnc.INTERP_IDLE)):
+        if self.is_running():
             if not self.s.task_mode == linuxcnc.MODE_MDI:
                 self.c.mode(linuxcnc.MODE_MDI)
                 self.c.wait_complete()
@@ -53,8 +57,6 @@ class lc():
     def get_g5x_index(self):
         if params["verbose"]:
             print("g5x_index:", self.s.g5x_index)
-            print("g5x_offset:", self.s.g5x_offset)
-            print("g92_offset:", self.s.g92_offset)
         return self.s.g5x_index
 
     def get_pins(self):
@@ -103,6 +105,7 @@ class axis_row_gui():
         self.entry.bind("<Return>", lambda event: self.enter_hit())
         self.entry.bind("<ButtonPress-1>", lambda event: self.enter_clicked())
         self.entry.grid(row=row, column=4, columnspan=1, sticky=W, padx=px)
+        self.disable_entry()
 
     def enter_hit(self):
         if params["verbose"]:
@@ -128,6 +131,26 @@ class axis_row_gui():
     def set_value(self, v):
         self.value.set(params["inch_format"].format(v))
 
+    def kp_entry(self, key):
+        if key == 'E':
+            self.enter_hit()
+            return
+        if key == 'C':
+            self.entry.delete(0, END)
+            return
+        if key == '<':
+            s = self.entry.get()
+            self.entry.delete(0, END)
+            self.entry.insert(END, s[:-1])
+            return
+        self.entry.insert(END, key)
+
+    def disable_entry(self):
+        self.entry.config(state=DISABLED)
+
+    def enable_entry(self):
+        self.entry.config(state=NORMAL)
+
 # The keypad
 class keypad_gui():
     def __init__(self, frame, callback):
@@ -145,7 +168,8 @@ class keypad_gui():
                 rb.grid(row=row, column=col, padx=px)
 
     def kp_hit(self):
-        print("kp_hit", self.kp_var.get())
+        if params["verbose"]:
+            print("kp_hit", self.kp_var.get())
         self.callback(self.kp_var.get())
         self.kp_var.set("")
 
@@ -226,6 +250,9 @@ class main_gui():
         root.grid_columnconfigure(1, weight=1)
 
     def entry_callback(self, row, value):
+        self.lcnc.poll()
+        if not self.lcnc.is_running():
+            return
         if value is None:
             # just a click
             if not self.last_row is None:
@@ -246,27 +273,23 @@ class main_gui():
         if params["verbose"]:
             print("rb_callback", self.rb_var.get())
         self.lcnc.poll()
+        if not self.lcnc.is_running():
+            return
         self.lcnc.send_mdi(self.coord_sys[self.rb_var.get()])
 
     def keypad_callback(self, key):
-        print("keypad_callback", key)
+        if params["verbose"]:
+            print("keypad_callback", key)
+        self.lcnc.poll()
+        if not self.lcnc.is_running():
+            return
         if self.last_row is None:
             return
-        if key == 'E':
-            self.axis_row[self.last_row].enter_hit()
-            return
-        if key == 'C':
-            self.axis_row[self.last_row].entry.delete(0, END)
-            return
-        if key == '<':
-            s = self.axis_row[self.last_row].entry.get()
-            self.axis_row[self.last_row].entry.delete(0, END)
-            self.axis_row[self.last_row].entry.insert(END, s[:-1])
-            return
-        self.axis_row[self.last_row].entry.insert(END, key)
+        self.axis_row[self.last_row].kp_entry(key)
 
     def indicator_callback(self):
-        print("indicator_callback")
+        if params["verbose"]:
+            print("indicator_callback")
         self.lcnc.poll()
         estop, homed, enabled = self.lcnc.get_indicators()
         if enabled:
@@ -282,6 +305,12 @@ class main_gui():
             self.axis_row[i].set_value(pins[i])
         estop, homed, enabled = self.lcnc.get_indicators()
         self.indicators.set_colors(estop, homed, enabled)
+        if self.lcnc.is_running():
+            for row in range(params["naxes"]):
+                self.axis_row[row].enable_entry()
+        else:
+            for row in range(params["naxes"]):
+                self.axis_row[row].disable_entry()
 
 def call_polls():
     global gui
