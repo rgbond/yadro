@@ -26,22 +26,21 @@ class lc():
             self.h.ready()
         except:
             exit(1)
-        
+
     def poll(self):
         self.s.poll()
 
     def is_homed(self):
         mask = 0
         for i in range(len(self.s.homed)):
-            if self.s.homed[i] != 0:
-                mask |= (1 << i)
+            mask |= (self.s.homed[i] << i)
         return mask == self.s.axis_mask
 
     def send_mdi(self, s):
         if params["verbose"]:
             print("send_mdi:", s)
         if (not self.s.estop and
-            self.s.state == linuxcnc.STATE_ON > 0 and
+            self.s.task_state == linuxcnc.STATE_ON and
             self.is_homed() and
             (self.s.interp_state == linuxcnc.INTERP_IDLE)):
             if not self.s.task_mode == linuxcnc.MODE_MDI:
@@ -50,7 +49,7 @@ class lc():
             self.c.mdi(s)
         else:
             print("can't send", s)
-        
+
     def get_g5x_index(self):
         if params["verbose"]:
             print("g5x_index:", self.s.g5x_index)
@@ -100,8 +99,9 @@ class axis_row_gui():
         self.half = Button(frame, text="1/2", font=params["font2"])
         self.half.bind("<ButtonRelease-1>", lambda event: self.half_up(event))
         self.half.grid(row=row, column=3, columnspan=1, padx=px, sticky=W)
-        self.entry = Entry(frame, width=10, justify=RIGHT, font=params["font1"])
+        self.entry = Entry(frame, width=10, justify=RIGHT, font=params["font1"], bg='light gray')
         self.entry.bind("<Return>", lambda event: self.enter_hit())
+        self.entry.bind("<ButtonPress-1>", lambda event: self.enter_clicked())
         self.entry.grid(row=row, column=4, columnspan=1, sticky=W, padx=px)
 
     def enter_hit(self):
@@ -109,6 +109,11 @@ class axis_row_gui():
             print("enter_hit")
         self.callback(self.row, float(self.entry.get()))
         self.entry.delete(0, END)
+
+    def enter_clicked(self):
+        if params["verbose"]:
+            print("enter_clicked")
+        self.callback(self.row, None)
 
     def zero_up(self, event):
         if params["verbose"]:
@@ -128,38 +133,39 @@ class keypad_gui():
     def __init__(self, frame, callback):
         self.kp_var = StringVar()
         self.callback = callback
-        rows = (7,8,9), (4,5,6), (1,2,3) 
+        rows = (7,8,9), (4,5,6), (1,2,3)
+        rows = (('7','8','9'), ('4','5','6'),
+                ('1','2','3'), ('0','.','E'))
         for row, values in enumerate(rows):
             for col, n in enumerate(values):
-                self.add_kp_button(frame, str(n), row, col, 1)
-        self.add_kp_button(frame, '0', 3, 0, 2)
-        self.add_kp_button(frame, '.', 3, 2, 1)
+                self.add_kp_button(frame, str(n), row, col)
 
-    def add_kp_button(self, frame, b, row, col, cw):
+    def add_kp_button(self, frame, b, row, col):
         px = 5
         rb = Radiobutton(frame, text=b, variable=self.kp_var, value=b, width=4,
                          indicatoron=0, command=lambda: self.kp_hit(),
                          font=params["font1"])
-        rb.grid(row=row, column=col, columnspan=cw, padx=px)
+        rb.grid(row=row, column=col, padx=px)
 
     def kp_hit(self):
         print("kp_hit", self.kp_var.get())
         self.callback(self.kp_var.get())
         self.kp_var.set("")
 
-# Misc indicators, controls
+# Misc indicators, enable control
 class indicator_gui():
     def __init__(self, frame, callback):
         px = 5
+        py = 2
         self.id_var = StringVar()
         self.callback = callback
         self.estop = Label(frame, width=8, text="Estop", font=params["font1"])
-        self.estop.grid(row=0, column=0, columnspan=1, sticky=NW)
+        self.estop.grid(row=0, column=0, padx=px, pady=py, sticky=NW)
         self.homed = Label(frame, width=8, text="Homed", font=params["font1"])
-        self.homed.grid(row=1, column=0, columnspan=1, sticky=NW)
+        self.homed.grid(row=1, column=0, padx=px, pady=py, sticky=NW)
         self.enabled = Button(frame, width=8, text="Enabled", font=params["font1"])
         self.enabled.bind("<ButtonRelease-1>", lambda event: self.enabled_up(event))
-        self.enabled.grid(row=2, column=0, columnspan=1, padx=px, sticky=NW)
+        self.enabled.grid(row=2, column=0, padx=px, pady=py, sticky=NW)
 
     def enabled_up(self, event):
         if params["verbose"]:
@@ -192,6 +198,7 @@ class main_gui():
         root.title("yadro")
         self.dro_frame = Frame(root)
         self.row_info = dict()
+        self.last_row = None
 
         for row, name in enumerate(params["axes"]):
             self.row_info[row] = axis_row_gui(self.dro_frame, row, name, self.entry_callback)
@@ -220,10 +227,20 @@ class main_gui():
         root.grid_columnconfigure(1, weight=1)
 
     def entry_callback(self, row, value):
+        if value is None:
+            # just a click
+            if not self.last_row is None:
+                self.row_info[self.last_row].entry.config(bg='light gray')
+            self.row_info[row].entry.config(bg='white')
+            self.last_row = row
+            return
+        # Enter hit
         if params["verbose"]:
             print("Entry callback", row, value)
         axis_name = self.row_info[row].text
         self.lcnc.send_mdi("G10 L20 P{} {}{}".format(row, axis_name, value))
+        self.row_info[self.last_row].entry.config(bg='light gray')
+        self.last_row = None
         # self.row_info[row].set_value(value)
 
     def rb_callback(self):
@@ -234,6 +251,12 @@ class main_gui():
 
     def keypad_callback(self, key):
         print("keypad_callback", key)
+        if self.last_row is None:
+            return
+        if key == 'E':
+            self.row_info[self.last_row].enter_hit()
+            return
+        self.row_info[self.last_row].entry.insert(END, key)
 
     def indicator_callback(self):
         print("indicator_callback")
