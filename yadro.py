@@ -90,6 +90,8 @@ class lc():
         return estop, homed, enabled
 
     def set_enable(self, on):
+        if params["verbose"]:
+            print("set_enable:", on)
         if (self.s.enabled > 0) == on:
             return
         if on:
