@@ -19,15 +19,15 @@
 from __future__ import print_function
 import sys
 if sys.version_info[0] == 2:
-    from Tkinter import *
+    import Tkinter as tk
 else:
-    from tkinter import *
+    import tkinter as tk
 import argparse
 import time
 import linuxcnc
 import hal
 
-root = Tk()
+root = tk.Tk()
 
 # Linux cnc interface
 class lc():
@@ -103,24 +103,24 @@ class axis_row_gui():
         px = 10
         self.row = row
         self.text = text
-        self.value = StringVar()
+        self.value = tk.StringVar()
         self.value.set(params["inch_format"].format(0.0))
         self.callback = callback
-        self.title = Label(frame, justify=RIGHT, anchor=E, text=text, font=params["font1"])
-        self.title.grid(row=row, column=0, columnspan=1, sticky=W)
-        self.vlabel = Label(frame, width=10, justify=RIGHT, anchor=E,
+        self.title = tk.Label(frame, justify=tk.RIGHT, anchor=tk.E, text=text, font=params["font1"])
+        self.title.grid(row=row, column=0, columnspan=1, sticky=tk.W)
+        self.vlabel = tk.Label(frame, width=10, justify=tk.RIGHT, anchor=tk.E,
                             textvariable=self.value, font=params["font1"])
-        self.vlabel.grid(row=row, column=1, columnspan=1, sticky=W)
-        self.zero = Button(frame, text="Z", font=params["font2"])
+        self.vlabel.grid(row=row, column=1, columnspan=1, sticky=tk.W)
+        self.zero = tk.Button(frame, text="Z", font=params["font2"])
         self.zero.bind("<ButtonRelease-1>", lambda event: self.zero_up(event))
-        self.zero.grid(row=row, column=2, columnspan=1, padx=px, sticky=W)
-        self.half = Button(frame, text="1/2", font=params["font2"])
+        self.zero.grid(row=row, column=2, columnspan=1, padx=px, sticky=tk.W)
+        self.half = tk.Button(frame, text="1/2", font=params["font2"])
         self.half.bind("<ButtonRelease-1>", lambda event: self.half_up(event))
-        self.half.grid(row=row, column=3, columnspan=1, padx=px, sticky=W)
-        self.entry = Entry(frame, width=10, justify=RIGHT, font=params["font1"], bg='light gray')
+        self.half.grid(row=row, column=3, columnspan=1, padx=px, sticky=tk.W)
+        self.entry = tk.Entry(frame, width=10, justify=tk.RIGHT, font=params["font1"], bg='light gray')
         self.entry.bind("<Return>", lambda event: self.enter_hit())
         self.entry.bind("<ButtonPress-1>", lambda event: self.enter_clicked())
-        self.entry.grid(row=row, column=4, columnspan=1, sticky=W, padx=px)
+        self.entry.grid(row=row, column=4, columnspan=1, sticky=tk.W, padx=px)
         self.disable_entry()
 
     def enter_hit(self):
@@ -132,7 +132,7 @@ class axis_row_gui():
             print('\a')
             return
         self.callback(self.row, v)
-        self.entry.delete(0, END)
+        self.entry.delete(0, tk.END)
 
     def enter_clicked(self):
         if params["verbose"]:
@@ -157,25 +157,25 @@ class axis_row_gui():
             self.enter_hit()
             return
         if key == 'C':
-            self.entry.delete(0, END)
+            self.entry.delete(0, tk.END)
             return
         if key == '<':
             s = self.entry.get()
-            self.entry.delete(0, END)
-            self.entry.insert(END, s[:-1])
+            self.entry.delete(0, tk.END)
+            self.entry.insert(tk.END, s[:-1])
             return
-        self.entry.insert(END, key)
+        self.entry.insert(tk.END, key)
 
     def disable_entry(self):
-        self.entry.config(state=DISABLED)
+        self.entry.config(state=tk.DISABLED)
 
     def enable_entry(self):
-        self.entry.config(state=NORMAL)
+        self.entry.config(state=tk.NORMAL)
 
 # The keypad
 class keypad_gui():
     def __init__(self, frame, callback):
-        self.kp_var = StringVar()
+        self.kp_var = tk.StringVar()
         self.callback = callback
         rows = (('7','8','9'), ('4','5','6'),
                 ('1','2','3'), ('0','.','-'),
@@ -183,7 +183,7 @@ class keypad_gui():
         px = 5
         for row, values in enumerate(rows):
             for col, c in enumerate(values):
-                rb = Radiobutton(frame, text=c, variable=self.kp_var, value=c, width=4,
+                rb = tk.Radiobutton(frame, text=c, variable=self.kp_var, value=c, width=4,
                                  indicatoron=0, command=lambda: self.kp_hit(),
                                  font=params["font1"])
                 rb.grid(row=row, column=col, padx=px)
@@ -199,15 +199,15 @@ class indicator_gui():
     def __init__(self, frame, callback):
         px = 5
         py = 2
-        self.id_var = StringVar()
+        self.id_var = tk.StringVar()
         self.callback = callback
-        self.estop = Label(frame, width=8, text="Estop", font=params["font1"])
+        self.estop = tk.Label(frame, width=8, text="Estop", font=params["font1"])
         self.estop.grid(row=0, column=0, padx=px, pady=py)
-        self.homed = Label(frame, width=8, text="Homed", font=params["font1"])
+        self.homed = tk.Label(frame, width=8, text="Homed", font=params["font1"])
         self.homed.grid(row=1, column=0, padx=px, pady=py)
-        self.enabled = Label(frame, width=8, text="Enabled", font=params["font1"])
+        self.enabled = tk.Label(frame, width=8, text="Enabled", font=params["font1"])
         self.enabled.grid(row=2, column=0, padx=px, pady=py)
-        self.enable = Button(frame, width=6, text="On/Off", font=params["font1"])
+        self.enable = tk.Button(frame, width=6, text="On/Off", font=params["font1"])
         self.enable.bind("<ButtonRelease-1>", lambda event: self.enable_up(event))
         self.enable.grid(row=3, column=0, padx=px, pady=py)
 
@@ -240,32 +240,32 @@ class main_gui():
         py = 15
 
         root.title("yadro")
-        self.dro_frame = Frame(root)
+        self.dro_frame = tk.Frame(root)
         self.axis_row = dict()
         self.last_row = None
 
         for row, name in enumerate(params["axes"]):
             self.axis_row[row] = axis_row_gui(self.dro_frame, row, name, self.entry_callback)
-        self.dro_frame.grid(row=0, column=0, columnspan = 2, padx=px, pady=py, sticky=NW)
+        self.dro_frame.grid(row=0, column=0, columnspan = 2, padx=px, pady=py, sticky=tk.NW)
 
-        self.keypad_frame = Frame(root)
+        self.keypad_frame = tk.Frame(root)
         self.keypad = keypad_gui(self.keypad_frame, self.keypad_callback)
-        self.keypad_frame.grid(row=1, column=0, padx=px, pady=py, sticky=NW)
+        self.keypad_frame.grid(row=1, column=0, padx=px, pady=py, sticky=tk.NW)
 
-        self.indicator_frame = Frame(root)
+        self.indicator_frame = tk.Frame(root)
         self.indicators = indicator_gui(self.indicator_frame, self.indicator_callback)
-        self.indicator_frame.grid(row=1, column=1, padx = px, pady=py, sticky=N)
+        self.indicator_frame.grid(row=1, column=1, padx = px, pady=py, sticky=tk.N)
 
-        self.coord_frame = Frame(root)
-        self.rb_var = IntVar()
+        self.coord_frame = tk.Frame(root)
+        self.rb_var = tk.IntVar()
         self.rb_var.set(lcnc.get_g5x_index()-1)
         self.coord_sys = ['G54', 'G55', 'G56', 'G57', 'G58', 'G59', 'G59.1', 'G59.2', 'G59.3']
         for col, cs in enumerate(self.coord_sys):
-            rb = Radiobutton(self.coord_frame, text=cs, variable=self.rb_var, value=col, width=6,
+            rb = tk.Radiobutton(self.coord_frame, text=cs, variable=self.rb_var, value=col, width=6,
                              indicatoron=0, command=lambda: self.rb_callback(),
                              font=params["font2"])
             rb.grid(row=0, column=col, columnspan=1, padx=px)
-        self.coord_frame.grid(row=2, column=0, columnspan = 2, padx=px, pady=py, sticky=NW)
+        self.coord_frame.grid(row=2, column=0, columnspan = 2, padx=px, pady=py, sticky=tk.NW)
 
         root.grid_rowconfigure(1, weight=1)
         root.grid_columnconfigure(1, weight=1)
