@@ -126,7 +126,12 @@ class axis_row_gui():
     def enter_hit(self):
         if params["verbose"]:
             print("enter_hit")
-        self.callback(self.row, float(self.entry.get()))
+        try:
+            v = float(self.entry.get())
+        except:
+            print('\a')
+            return
+        self.callback(self.row, v)
         self.entry.delete(0, END)
 
     def enter_clicked(self):
@@ -338,7 +343,9 @@ def call_polls():
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--verbose', '-v', action='count', default=0,
-                    help='Print debug info')
+                    help='print debug info')
+    parser.add_argument('--point_size', '-p', dest='point_size', type=int, default=20,
+                    help='font point size, default: 20')
     parser.add_argument("axes", type=str, help="Axes (example: XYZ)")
 
     args = parser.parse_args()
@@ -354,8 +361,8 @@ if __name__ == '__main__':
         params["verbose"] = True
     if args.verbose > 1:
         params["very_verbose"] = True
-    params["font1"] = ("Helvetica", 20)
-    params["font2"] = ("Helvetica", 10)
+    params["font1"] = ("Helvetica", args.point_size)
+    params["font2"] = ("Helvetica", int(args.point_size / 2))
     params["inch_format"] = "{:.4f}"
 
     lcnc = lc()
