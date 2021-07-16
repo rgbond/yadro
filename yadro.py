@@ -231,6 +231,29 @@ class indicator_gui():
         self.homed.config(bg=homed_color)
         self.enabled.config(bg=enabled_color)
 
+# The G5x radio button5
+class coord_systems():
+    def __init__(self, frame, g5x, callback):
+        self.callback = callback
+        self.rb_var = tk.IntVar()
+        self.rb_var.set(g5x - 1)
+        self.coord_sys = ['G54', 'G55', 'G56', 'G57', 'G58', 'G59', 'G59.1', 'G59.2', 'G59.3']
+        for col, cs in enumerate(self.coord_sys):
+            rb = tk.Radiobutton(frame, text=cs, variable=self.rb_var, value=col, width=6,
+                             indicatoron=0, command=lambda: self.rb_hit(),
+                             font=params["font2"])
+            rb.grid(row=0, column=col, columnspan=1, padx=5)
+
+    def rb_hit(self):
+        if params["verbose"]:
+            print("rb_hit")
+        coord_sys_name = self.coord_sys[self.rb_var.get()]
+        self.callback(coord_sys_name)
+
+    def set_g5x_index(self, g5x):
+        if params["very_verbose"]:
+            print("set_g5x_index", g5x)
+        self.rb_var.set(g5x - 1)
 
 class main_gui():
     def __init__(self, lcnc):
@@ -257,14 +280,7 @@ class main_gui():
         self.indicator_frame.grid(row=1, column=1, padx = px, pady=py, sticky=tk.N)
 
         self.coord_frame = tk.Frame(root)
-        self.rb_var = tk.IntVar()
-        self.rb_var.set(lcnc.get_g5x_index()-1)
-        self.coord_sys = ['G54', 'G55', 'G56', 'G57', 'G58', 'G59', 'G59.1', 'G59.2', 'G59.3']
-        for col, cs in enumerate(self.coord_sys):
-            rb = tk.Radiobutton(self.coord_frame, text=cs, variable=self.rb_var, value=col, width=6,
-                             indicatoron=0, command=lambda: self.rb_callback(),
-                             font=params["font2"])
-            rb.grid(row=0, column=col, columnspan=1, padx=px)
+        self.coords = coord_systems(self.coord_frame, lcnc.get_g5x_index(), self.coord_callback)
         self.coord_frame.grid(row=2, column=0, columnspan = 2, padx=px, pady=py, sticky=tk.NW)
 
         root.grid_rowconfigure(1, weight=1)
@@ -292,13 +308,13 @@ class main_gui():
         self.last_row = None
         # self.axis_row[row].set_value(value)
 
-    def rb_callback(self):
+    def coord_callback(self, g5x):
         if params["verbose"]:
-            print("rb_callback", self.rb_var.get())
+            print("coord_callback", g5x)
         self.lcnc.poll()
         if not self.lcnc.is_running():
             return
-        self.lcnc.send_mdi(self.coord_sys[self.rb_var.get()])
+        self.lcnc.send_mdi(g5x)
 
     def keypad_callback(self, key):
         if params["verbose"]:
@@ -322,7 +338,7 @@ class main_gui():
 
     def poll(self):
         self.lcnc.poll()
-        self.rb_var.set(self.lcnc.get_g5x_index()-1)
+        self.coords.set_g5x_index(self.lcnc.get_g5x_index())
         pins = self.lcnc.get_pins()
         for i in range(len(pins)):
             self.axis_row[i].set_value(pins[i])
