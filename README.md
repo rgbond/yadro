@@ -8,6 +8,9 @@ Invoke with "yadro.py coord" where coord is the list of axes. Example:
 
     yadro XYZ
 
+A optional "--point_size" argument can change the default font point size which
+adjusts the overall size of the display.
+
 When it starts, yadro creates an input hal pin for each of the axes. For the above
 example, yadro will create these hal pins:
 
