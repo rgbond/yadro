@@ -154,26 +154,28 @@ class keypad_gui():
         self.kp_var.set("")
 
 class coord_systems():
-    def __init__(self, frame, ncoords):
+    def __init__(self, frame, ncoords, callback):
+        self.callback = callback
         self.rb_var = tk.IntVar()
-        self.rb_var.set(0)
+        self.rb_var.set(1)
         self.coord_sys = ['mcs', 'cs1', 'cs2', 'cs3', 'cs4']
         self.coords = []
         for i in range(len(self.coord_sys)):
             self.coords.append([0]*ncoords)
         self.cur_idx = 0
         self.cur_sys = self.coords[self.cur_idx]
-        for col, cs in enumerate(self.coord_sys):
-            rb = tk.Radiobutton(frame, text=cs, variable=self.rb_var, value=col, width=6,
+        for row, cs in enumerate(self.coord_sys):
+            rb = tk.Radiobutton(frame, text=cs, variable=self.rb_var, value=row, width=6,
                      indicatoron=0, command=lambda: self.rb_hit(),
-                     font=params["font2"])
-            rb.grid(row=0, column=col, columnspan=1, padx=5)
+                     font=params["font1"])
+            rb.grid(row=row, column=0, columnspan=1, padx=5)
 
     def rb_hit(self):
         self.cur_idx = self.rb_var.get()
         if params["verbose"]:
             print("rb_hit", self.coord_sys[self.cur_idx])
         self.cur_sys = self.coords[self.cur_idx]
+        self.callback(self.cur_idx)
 
 class main_gui():
     def __init__(self, lcnc):
@@ -191,15 +193,15 @@ class main_gui():
             self.axis_row[row] = axis_row_gui(self.dro_frame, row, name,
                                               self.entry_callback)
             self.axis_row[row].enable_entry()
-        self.dro_frame.grid(row=0, column=0, padx=px, pady=py, sticky=tk.NW)
+        self.dro_frame.grid(row=0, column=0, columnspan=2, padx=px, pady=py, sticky=tk.NW)
 
         self.keypad_frame = tk.Frame(root)
         self.keypad = keypad_gui(self.keypad_frame, self.keypad_callback)
         self.keypad_frame.grid(row=1, column=0, padx=px, pady=py, sticky=tk.NW)
 
         self.coord_frame = tk.Frame(root)
-        self.coords = coord_systems(self.coord_frame, params["naxes"])
-        self.coord_frame.grid(row=2, column=0, columnspan = 2, padx=px, pady=py, sticky=tk.NW)
+        self.coords = coord_systems(self.coord_frame, params["naxes"], self.coord_callback)
+        self.coord_frame.grid(row=1, column=1, padx=px, pady=py, sticky=tk.N)
 
     def entry_callback(self, row, value):
         if params["verbose"]:
@@ -220,6 +222,16 @@ class main_gui():
         if not self.last_row is None:
             self.axis_row[self.last_row].entry.config(bg='light gray')
         self.last_row = None
+
+    def coord_callback(self, coord_sys_idx):
+        if params["verbose"]:
+            print("coord_callback", coord_sys_idx)
+        if coord_sys_idx == 0:
+            for row in range(params["naxes"]):
+                self.axis_row[row].disable_entry()
+        else:
+            for row in range(params["naxes"]):
+                self.axis_row[row].enable_entry()
 
     def keypad_callback(self, key):
         if params["verbose"]:
