@@ -7,8 +7,10 @@ best with Linuxcnc fully up with the axes homed and enabled.
 
 Mdro is a simpler, manual only dro that is less hooked into Linuxcnc internals. It
 should be hooked directly to the machine's dro outputs. It is blissfully unaware
-of most of the Linux cnc state. I use it when running the machine in manual mode
+of most of the Linuxcnc state. I use it when running the machine in manual mode
 using the hand cranks on the machine.
+
+See screenshot.png for a screenshot.
 
 ## yadro invocation
 
@@ -60,4 +62,3 @@ I hook them up to halui like this:
     net z-pos-fb => mdro.2
 
 
-See screenshot.png for a screenshot.
