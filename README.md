@@ -43,8 +43,10 @@ Invoke from your hal file with "mdro.py coord" where coord is the list of axes. 
 
     mdro XYZ
 
-A optional "--point_size" argument changes the default font point size which
+An optional "--point_size" argument changes the default font point size which
 adjusts the overall size of the display.
+
+An optional "--mm" argument can be used to specify that the dro units are in mm.
 
 When it starts, mdro creates an input hal pin for each of the axes. For the above
 example, mdro will create these hal pins:
