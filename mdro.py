@@ -63,7 +63,11 @@ class axis_row_gui():
         self.row = row
         self.text = text
         self.value = tk.StringVar()
-        self.value.set(params["inch_format"].format(0.0))
+        if params["mm"] == 0:
+            self.cur_format = params["inch_format"]
+        else:
+            self.cur_format = params["mm_format"]
+        self.value.set(self.cur_format.format(0.0))
         self.callback = callback
         self.title = tk.Label(frame, justify=tk.RIGHT, anchor=tk.E, text=text, font=params["font1"])
         self.title.grid(row=row, column=0, columnspan=1, sticky=tk.W)
@@ -109,7 +113,7 @@ class axis_row_gui():
         self.callback(self.row, float(self.value.get())/2.0)
 
     def set_value(self, v):
-        self.value.set(params["inch_format"].format(v))
+        self.value.set(self.cur_format.format(v))
 
     def kp_entry(self, key):
         if key == 'E':
@@ -130,6 +134,12 @@ class axis_row_gui():
 
     def enable_entry(self):
         self.entry.config(state=tk.NORMAL)
+
+    def update_units(self, units):
+        if units == "inch":
+            self.cur_format = params["inch_format"]
+        else:
+            self.cur_format = params["mm_format"]
 
 # The keypad
 class keypad_gui():
@@ -161,14 +171,15 @@ class coord_systems():
         self.coord_sys = ['mcs', 'cs1', 'cs2', 'cs3', 'cs4']
         self.coords = []
         for i in range(len(self.coord_sys)):
-            self.coords.append([0]*ncoords)
-        self.cur_idx = 0
+            self.coords.append([0.0]*ncoords)
+        self.cur_idx = 1
         self.cur_sys = self.coords[self.cur_idx]
         for row, cs in enumerate(self.coord_sys):
             rb = tk.Radiobutton(frame, text=cs, variable=self.rb_var, value=row, width=6,
                      indicatoron=0, command=lambda: self.rb_hit(),
                      font=params["font1"])
             rb.grid(row=row, column=0, columnspan=1, padx=5)
+        self.last_units_factor = 1.0
 
     def rb_hit(self):
         self.cur_idx = self.rb_var.get()
@@ -176,6 +187,13 @@ class coord_systems():
             print("rb_hit", self.coord_sys[self.cur_idx])
         self.cur_sys = self.coords[self.cur_idx]
         self.callback(self.cur_idx)
+
+    def update_units(self, units_factor):
+        for i in range(len(self.coords)):
+            for j in range(len(self.coords[i])):
+                self.coords[i][j] /= self.last_units_factor
+                self.coords[i][j] *= units_factor
+        self.last_units_factor = units_factor
 
 class main_gui():
     def __init__(self, lcnc):
@@ -188,6 +206,13 @@ class main_gui():
         self.dro_frame = tk.Frame(root)
         self.axis_row = dict()
         self.last_row = None
+        self.disp_inch = tk.IntVar()
+        if params["mm"]:
+            self.disp_inch.set(2)
+        else:
+            self.disp_inch.set(0)
+        self.mm_adj = [1.0, 1.0/25.4, 25.4, 1.0]
+        self.units_factor = 1.0
 
         for row, name in enumerate(params["axes"]):
             self.axis_row[row] = axis_row_gui(self.dro_frame, row, name,
@@ -202,6 +227,31 @@ class main_gui():
         self.coord_frame = tk.Frame(root)
         self.coords = coord_systems(self.coord_frame, params["naxes"], self.coord_callback)
         self.coord_frame.grid(row=1, column=1, padx=px, pady=py, sticky=tk.N)
+
+        self.inch_frame = tk.Frame(root)
+        self.inches = tk.Radiobutton(self.inch_frame, text="inch",
+                                     variable=self.disp_inch, value=0,
+                                     command=lambda: self.units_hit(),
+                                     font=params["font1"])
+        self.inches.grid(row=0, column=0)
+        self.inches = tk.Radiobutton(self.inch_frame, text="mm",
+                                     variable=self.disp_inch, value=2,
+                                     command=lambda: self.units_hit(),
+                                     font=params["font1"])
+        self.inches.grid(row=0, column=1)
+        self.inch_frame.grid(row=2, column=0, padx=px, pady=py, sticky=tk.NW)
+
+    def units_hit(self):
+        if params["verbose"]:
+            print("units_hit", self.disp_inch.get())
+        self.units_factor = self.mm_adj[params["mm"] + self.disp_inch.get()]
+        self.coords.update_units(self.units_factor)
+        if self.disp_inch.get() == 0:
+            new_units = "inch"
+        else:
+            new_units = "mm"
+        for i in range(params["naxes"]):
+            self.axis_row[i].update_units(new_units)
 
     def entry_callback(self, row, value):
         if params["verbose"]:
@@ -218,7 +268,8 @@ class main_gui():
         pins = self.lcnc.get_pins()
         # Can't change the mcs entry
         if self.coords.cur_idx != 0:
-            self.coords.cur_sys[row] = value - pins[row]
+            pin = pins[row] * self.units_factor
+            self.coords.cur_sys[row] = value - pin
         if not self.last_row is None:
             self.axis_row[self.last_row].entry.config(bg='light gray')
         self.last_row = None
@@ -244,7 +295,8 @@ class main_gui():
         self.lcnc.poll()
         pins = self.lcnc.get_pins()
         for i in range(len(pins)):
-            self.axis_row[i].set_value(pins[i] + self.coords.cur_sys[i])
+            pin = pins[i] * self.units_factor
+            self.axis_row[i].set_value(pin + self.coords.cur_sys[i])
 
 def call_polls():
     global gui
@@ -257,6 +309,8 @@ if __name__ == '__main__':
                     help='print debug info')
     parser.add_argument('--point_size', '-p', dest='point_size', type=int, default=20,
                     help='font point size, default: 20')
+    parser.add_argument('--mm', '-m', action='store_const', const=1, default=0,
+                    help='dro values in mm')
     parser.add_argument("axes", type=str, help="Axes (example: XYZ)")
 
     args = parser.parse_args()
@@ -272,9 +326,11 @@ if __name__ == '__main__':
         params["verbose"] = True
     if args.verbose > 1:
         params["very_verbose"] = True
+    params["mm"] = args.mm
     params["font1"] = ("Helvetica", args.point_size)
     params["font2"] = ("Helvetica", int(args.point_size / 2))
     params["inch_format"] = "{:.4f}"
+    params["mm_format"] = "{:.2f}"
 
     lcnc = lc()
     gui = main_gui(lcnc)
