@@ -45,7 +45,7 @@ class lc():
             if params["is_display"]:
                 self.indexes = ["index-enable."+str(p) for p in range(params["naxes"])]
                 for pin in self.indexes:
-                    self.h.newpin(pin, hal.HAL_FLOAT, hal.HAL_IN)
+                    self.h.newpin(pin, hal.HAL_BIT, hal.HAL_IO)
             self.h.ready()
             if params["verbose"]:
                 print("Linuxcnc interface up")
@@ -62,8 +62,8 @@ class lc():
             print("pins:", pins)
         return pins
 
-    def set_index_enable(self, pin, v):
-        self.h[self.indexes[pin]] = v
+    def set_index_enable(self, pin):
+        self.h[self.indexes[pin]] = 1
 
 # One of these for each DRO row
 class axis_row_gui():
@@ -314,7 +314,7 @@ class main_gui():
     def index_callback(self, row):
         if params["verbose"]:
             print("main_index_callback", row)
-        self.lcnc.set_index_enable(row, 0)
+        self.lcnc.set_index_enable(row)
         
     def poll(self):
         self.lcnc.poll()
