@@ -19,6 +19,7 @@
 
 from __future__ import print_function
 import sys
+import os
 if sys.version_info[0] == 2:
     import Tkinter as tk
 else:
@@ -38,8 +39,13 @@ class lc():
             self.s.poll()
             self.c = linuxcnc.command()
             self.h = hal.component("mdro")
-            for p in range(params["naxes"]):
-                self.h.newpin(str(p), hal.HAL_FLOAT, hal.HAL_IN)
+            self.pins = ["axis."+str(p) for p in range(params["naxes"])]
+            for pin in self.pins:
+                self.h.newpin(pin, hal.HAL_FLOAT, hal.HAL_IN)
+            if params["is_display"]:
+                self.indexes = ["index-enable."+str(p) for p in range(params["naxes"])]
+                for pin in self.indexes:
+                    self.h.newpin(pin, hal.HAL_FLOAT, hal.HAL_IN)
             self.h.ready()
             if params["verbose"]:
                 print("Linuxcnc interface up")
@@ -51,14 +57,17 @@ class lc():
         self.s.poll()
 
     def get_pins(self):
-        pins = [self.h[str(p)] for p in range(params['naxes'])]
+        pins = [self.h[pin] for pin in self.pins]
         if params["very_verbose"]:
             print("pins:", pins)
         return pins
 
+    def set_index_enable(self, pin, v):
+        self.h[self.indexes[pin]] = v
+
 # One of these for each DRO row
 class axis_row_gui():
-    def __init__(self, frame, row, text, callback):
+    def __init__(self, frame, row, text, entry_callback, index_callback):
         px = 10
         self.row = row
         self.text = text
@@ -68,7 +77,8 @@ class axis_row_gui():
         else:
             self.cur_format = params["mm_format"]
         self.value.set(self.cur_format.format(0.0))
-        self.callback = callback
+        self.entry_callback = entry_callback
+        self.index_callback = index_callback
         self.title = tk.Label(frame, justify=tk.RIGHT, anchor=tk.E, text=text, font=params["font1"])
         self.title.grid(row=row, column=0, columnspan=1, sticky=tk.W)
         self.vlabel = tk.Label(frame, width=10, justify=tk.RIGHT, anchor=tk.E,
@@ -84,6 +94,10 @@ class axis_row_gui():
         self.entry.bind("<Return>", lambda event: self.enter_hit())
         self.entry.bind("<ButtonPress-1>", lambda event: self.enter_clicked())
         self.entry.grid(row=row, column=4, columnspan=1, sticky=tk.W, padx=px)
+        if params["is_display"]:
+            self.index = tk.Button(frame, text="I", font=params["font2"])
+            self.index.bind("<ButtonRelease-1>", lambda event: self.index_up(event))
+            self.index.grid(row=row, column=5, columnspan=1, padx=px, sticky=tk.W)
         self.disable_entry()
 
     def enter_hit(self):
@@ -94,23 +108,28 @@ class axis_row_gui():
         except:
             print('\a')
             return
-        self.callback(self.row, v)
+        self.entry_callback(self.row, v)
         self.entry.delete(0, tk.END)
 
     def enter_clicked(self):
         if params["verbose"]:
             print("enter_clicked")
-        self.callback(self.row, None)
+        self.entry_callback(self.row, None)
 
     def zero_up(self, event):
         if params["verbose"]:
             print("zero_up")
-        self.callback(self.row, 0.0)
+        self.entry_callback(self.row, 0.0)
 
     def half_up(self, event):
         if params["verbose"]:
             print("half_up")
-        self.callback(self.row, float(self.value.get())/2.0)
+        self.entry_callback(self.row, float(self.value.get())/2.0)
+
+    def index_up(self, event):
+        if params["verbose"]:
+            print("index_up")
+        self.index_callback(self.row)
 
     def set_value(self, v):
         self.value.set(self.cur_format.format(v))
@@ -216,7 +235,8 @@ class main_gui():
 
         for row, name in enumerate(params["axes"]):
             self.axis_row[row] = axis_row_gui(self.dro_frame, row, name,
-                                              self.entry_callback)
+                                              self.entry_callback,
+                                              self.index_callback)
             self.axis_row[row].enable_entry()
         self.dro_frame.grid(row=0, column=0, columnspan=2, padx=px, pady=py, sticky=tk.NW)
 
@@ -291,12 +311,35 @@ class main_gui():
             return
         self.axis_row[self.last_row].kp_entry(key)
 
+    def index_callback(self, row):
+        if params["verbose"]:
+            print("main_index_callback", row)
+        self.lcnc.set_index_enable(row, 0)
+        
     def poll(self):
         self.lcnc.poll()
         pins = self.lcnc.get_pins()
         for i in range(len(pins)):
             pin = pins[i] * self.units_factor
             self.axis_row[i].set_value(pin + self.coords.cur_sys[i])
+
+def run_postgui():
+    # Run the postgui hal files if called from DISPLAY section of .ini file
+    if params["verbose"]:
+        print("mdro ini file: ", params["ini"])
+    inifile = linuxcnc.ini(params["ini"])
+    postgui_halfiles = inifile.findall("HAL", "POSTGUI_HALFILE") or None
+    if not postgui_halfiles is None:
+        for f in postgui_halfiles:
+            if params["verbose"]:
+                halcmd_args = ["halcmd", "-V", "-i", args.ini, "-f", f]
+                print("halcmd", halcmd_args)
+            else:
+                halcmd_args = ["halcmd", "-i", args.ini, "-f", f]
+        res = os.spawnvp(os.P_WAIT, "halcmd", halcmd_args)
+        if res:
+            print("Error processing halfile:", f, "mdro exiting")
+            exit(1)
 
 def call_polls():
     global gui
@@ -311,7 +354,9 @@ if __name__ == '__main__':
                     help='font point size, default: 20')
     parser.add_argument('--mm', '-m', action='store_const', const=1, default=0,
                     help='dro values in mm')
-    parser.add_argument("axes", type=str, help="Axes (example: XYZ)")
+    parser.add_argument("--ini", "-ini", type=str, help="ini file name")
+    parser.add_argument("axes", nargs='?', type=str, default='XYZ',
+                    help="Axes (example: XYZ)")
 
     args = parser.parse_args()
 
@@ -320,6 +365,8 @@ if __name__ == '__main__':
     params = {}
     params["naxes"] = len(axes)
     params["axes"] = axes
+    params["is_display"] = not args.ini is None
+    params["ini"] = args.ini
     params["verbose"] = False
     params["very_verbose"] = False
     if args.verbose > 0:
@@ -333,7 +380,11 @@ if __name__ == '__main__':
     params["mm_format"] = "{:.2f}"
 
     lcnc = lc()
+
     gui = main_gui(lcnc)
+
+    if params["is_display"]:
+        run_postgui()
 
     root.after(20, call_polls);
     root.mainloop()
