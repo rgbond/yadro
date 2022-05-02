@@ -42,10 +42,9 @@ class lc():
             self.pins = ["axis."+str(p) for p in range(params["naxes"])]
             for pin in self.pins:
                 self.h.newpin(pin, hal.HAL_FLOAT, hal.HAL_IN)
-            if params["is_display"]:
-                self.indexes = ["index-enable."+str(p) for p in range(params["naxes"])]
-                for pin in self.indexes:
-                    self.h.newpin(pin, hal.HAL_BIT, hal.HAL_IO)
+            self.indexes = ["index-enable."+str(p) for p in range(params["naxes"])]
+            for pin in self.indexes:
+                self.h.newpin(pin, hal.HAL_BIT, hal.HAL_IO)
             self.h.ready()
             if params["verbose"]:
                 print("Linuxcnc interface up")
@@ -63,6 +62,8 @@ class lc():
         return pins
 
     def set_index_enable(self, pin):
+        if params["verbose"]:
+            print(self.indexs[pin], "= 1")
         self.h[self.indexes[pin]] = 1
 
 # One of these for each DRO row
@@ -94,10 +95,9 @@ class axis_row_gui():
         self.entry.bind("<Return>", lambda event: self.enter_hit())
         self.entry.bind("<ButtonPress-1>", lambda event: self.enter_clicked())
         self.entry.grid(row=row, column=4, columnspan=1, sticky=tk.W, padx=px)
-        if params["is_display"]:
-            self.index = tk.Button(frame, text="I", font=params["font2"])
-            self.index.bind("<ButtonRelease-1>", lambda event: self.index_up(event))
-            self.index.grid(row=row, column=5, columnspan=1, padx=px, sticky=tk.W)
+        self.index = tk.Button(frame, text="I", font=params["font2"])
+        self.index.bind("<ButtonRelease-1>", lambda event: self.index_up(event))
+        self.index.grid(row=row, column=5, columnspan=1, padx=px, sticky=tk.W)
         self.disable_entry()
 
     def enter_hit(self):
