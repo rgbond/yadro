@@ -61,10 +61,15 @@ class lc():
             print("pins:", pins)
         return pins
 
-    def set_index_enable(self, pin):
+    def index_ready(self, row):
+        pin_name = self.indexes[row]
+        return hal.pin_has_writer("mdro."+pin_name) and self.h[pin_name] == 0
+
+    def set_index_enable(self, row):
+        pin_name = self.indexes[row]
         if params["verbose"]:
-            print(self.indexs[pin], "= 1")
-        self.h[self.indexes[pin]] = 1
+            print(pin_name, "= 1")
+        self.h[pin_name] = 1
 
 # One of these for each DRO row
 class axis_row_gui():
@@ -153,6 +158,12 @@ class axis_row_gui():
 
     def enable_entry(self):
         self.entry.config(state=tk.NORMAL)
+
+    def disable_index(self):
+        self.index.config(state=tk.DISABLED)
+
+    def enable_index(self):
+        self.index.config(state=tk.NORMAL)
 
     def update_units(self, units):
         if units == "inch":
@@ -314,7 +325,11 @@ class main_gui():
     def index_callback(self, row):
         if params["verbose"]:
             print("main_index_callback", row)
-        self.lcnc.set_index_enable(row)
+        if self.lcnc.index_ready(row):
+            self.lcnc.set_index_enable(row)
+        else:
+            if params["verbose"]:
+                print("index seq not ready", row)
         
     def poll(self):
         self.lcnc.poll()
@@ -322,6 +337,10 @@ class main_gui():
         for i in range(len(pins)):
             pin = pins[i] * self.units_factor
             self.axis_row[i].set_value(pin + self.coords.cur_sys[i])
+            if self.lcnc.index_ready(i):
+                self.axis_row[i].enable_index()
+            else:
+                self.axis_row[i].disable_index()
 
 def run_postgui():
     # Run the postgui hal files if called from DISPLAY section of .ini file
