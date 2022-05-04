@@ -194,14 +194,19 @@ class keypad_gui():
         self.kp_var.set("")
 
 class coord_systems():
-    def __init__(self, frame, ncoords, callback):
+    def __init__(self, frame, callback):
         self.callback = callback
         self.rb_var = tk.IntVar()
         self.rb_var.set(1)
-        self.coord_sys = ['mcs', 'cs1', 'cs2', 'cs3', 'cs4']
+        if params["is_display"] and params["preload"]:
+            self.coord_sys = ['mcs', 'g54', 'g55', 'g56', 'g57']
+        else:
+            self.coord_sys = ['mcs', 'cs1', 'cs2', 'cs3', 'cs4']
         self.coords = []
         for i in range(len(self.coord_sys)):
-            self.coords.append([0.0]*ncoords)
+            self.coords.append([0.0]*params["naxes"])
+        if params["preload"]:
+            self.preload_cs()
         self.cur_idx = 1
         self.cur_sys = self.coords[self.cur_idx]
         for row, cs in enumerate(self.coord_sys):
@@ -224,6 +229,45 @@ class coord_systems():
                 self.coords[i][j] /= self.last_units_factor
                 self.coords[i][j] *= units_factor
         self.last_units_factor = units_factor
+
+    def preload_cs(self):
+        if params["ini"] is None:
+            print("No .ini file specified")
+            exit(1)
+        valid_axes = list("XYZABCUVW")
+        for a in params["axes"]:
+            if not (a in valid_axes or a.upper() in valid_axes):
+                print('Axes must be one of "XYZABCUVW"')
+                exit(1)
+        inifile = linuxcnc.ini(params["ini"])
+        var_file = inifile.find("RS274NGC", "PARAMETER_FILE") or None
+        if not os.path.isfile(var_file):
+            print("Could not find", var_file)
+            exit(1)
+        number_to_load = (len(self.coord_sys) - 1)*20
+        max_idx = 5221 + number_to_load
+        self.vc = [0.0] * number_to_load
+        with open(var_file, 'r') as f:
+            for line in f:
+                line = line.strip()
+                fields = line.split()
+                try:
+                    idx = int(fields[0])
+                    v = float(fields[1])
+                except:
+                    print("Invalid parameter file:", var_file)
+                    exit(1)
+                if idx >= max_idx:
+                    break
+                if idx >= 5221:
+                    self.vc[idx - 5221] = v
+        axis_idx = {}
+        for i, a in enumerate(valid_axes):
+            axis_idx[a] = i
+            axis_idx[a.lower()] = i
+        for i in range(1, len(self.coord_sys)):
+            for j, a in enumerate(params["axes"]):
+                self.coords[i][j] = self.vc[(i - 1) * 20 + axis_idx[a]]
 
 class main_gui():
     def __init__(self, lcnc):
@@ -256,7 +300,7 @@ class main_gui():
         self.keypad_frame.grid(row=1, column=0, padx=px, pady=py, sticky=tk.NW)
 
         self.coord_frame = tk.Frame(root)
-        self.coords = coord_systems(self.coord_frame, params["naxes"], self.coord_callback)
+        self.coords = coord_systems(self.coord_frame, self.coord_callback)
         self.coord_frame.grid(row=1, column=1, padx=px, pady=py, sticky=tk.N)
 
         self.inch_frame = tk.Frame(root)
@@ -369,10 +413,12 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--verbose', '-v', action='count', default=0,
                     help='print debug info')
-    parser.add_argument('--point_size', '-p', dest='point_size', type=int, default=20,
-                    help='font point size, default: 20')
+    parser.add_argument('--point_size', '-p', dest='point_size', type=int,
+                    default=20, help='font point size, default: 20')
     parser.add_argument('--mm', '-m', action='store_const', const=1, default=0,
                     help='dro values in mm')
+    parser.add_argument("--load_cs", "-l", action='store_true',
+                    help="load g5x coordinate system")
     parser.add_argument("--ini", "-ini", type=str, help="ini file name")
     parser.add_argument("axes", nargs='?', type=str, default='XYZ',
                     help="Axes (example: XYZ)")
@@ -384,6 +430,7 @@ if __name__ == '__main__':
     params = {}
     params["naxes"] = len(axes)
     params["axes"] = axes
+    params["preload"] = args.load_cs
     params["is_display"] = not args.ini is None
     params["ini"] = args.ini
     params["verbose"] = False
