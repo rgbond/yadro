@@ -27,12 +27,12 @@
 mdro \- manual only Digital Read Out (DRO)
 .SH SYNOPSIS
 .B mdro
-[\fB\-v\fR] [\fB\-p\fR \fIpoint_size\fR] [\fB\-m\fR] [\fB\-ini\fR \fIini_file_name\fR] [\fIaxes\fR]
+[\fB\-v\fR] [\fB\-p\fR \fIpoint_size\fR] [\fB\-m\fR] [\fB\-ini\fR \fIini_file_name\fR] [\fB\-l\fR] [\fIaxes\fR]
 .SH DESCRIPTION
-\fBmdro\fR is a manual only DRO that provides functionality similar to a
-traditional DRO on a manual machine. It is most useful for machines 
-converted to CNC when the user wants to manually control the
-machine but keep using the DRO scales on the axes.
+\fBmdro\fR is a manual only DRO providing functionality similar to a
+traditional manual DRO. It is most useful for manual machines 
+converted to CNC. It allows the user to manually control the
+machine while continuing to use the DRO scales on the axes.
 The GUI can be sized to match the user's screen. It is
 mouse-only and touchscreen friendly.
 .SH OPTIONS
@@ -46,14 +46,18 @@ the overall size of the window on the screen. Default is 20. Typical values
 range from 20 to 30.
 .TP
 \fBm\fR
-convert inches to mm. Convert DRO hardware reporting inches to mm in the display
+Convert inches to mm. Convert DRO hardware reporting inches to mm in the display
 fields.
 .TP
 \fBini\fR \fIini_file_name\fR
 This option is provided by linuxcnc when the program is
-started from the DISPLAY entry in a linuxcnc .ini file. It is used to
-find the POSTGUI_HALFILE entry in the .ini file so that hal signals
-be hooked to mdro.
+started from the \fIDISPLAY\fR entry in a linuxcnc .ini file. It is used to
+find the \fIPOSTGUI_HALFILE\fR entry and optionally the \fIRS274NGC\fR
+\fIPARAMETER_FILE\fR entry in the .ini file.
+.TP
+\fBl\fR
+Load G54 through G57 coordinates from the .var file referenced in the .ini
+file. Requires the \fBini\fR option.
 .TP
 \fIaxes\fR
 this option is used to specify the names of the axes handled by the program.
@@ -77,10 +81,12 @@ enter coordinate data.
 Finally, buttons on the screen allow the selection of inch or mm data display.
 
 .SH USAGE
-\fBmdro\fR is normally started from the DISPLAY entry in a dedicated \fBmdro\fR  .ini file.  The .ini file and the associated HAL files  should include the
-pins and signals that support the DRO scales. The HAL hookup must be done
-in the POSTGUI_HALFILE referenced in the .ini file. Note that the point size
-parameter and the \fIaxes\fR parameter can be specified on the DISPLAY line. 
+\fBmdro\fR is normally started from the \fIDISPLAY\fR entry in a dedicated
+\fBmdro.ini\fR file.  The .ini file and the associated HAL files  should
+include the pins and signals that support the DRO scales. The HAL hookup to 
+\fBmdro\fR must be done in the \fIPOSTGUI_HALFILE\fR referenced in the .ini file.
+Note that \fIaxes\fR parameter and the other options can be specified on the
+\fIDISPLAY\fR line. 
 
 Using an example of "XYZA" for an \fIaxes\fR argument, these pins will be created
 when \fBmdro\fR starts:
@@ -100,9 +106,6 @@ to x-pos-fb in the POSTGUI-HAL file. The index pins should be hooked to the
 corresponding index-enable pins from the DRO.
 
 \fBmdro\fR can also be started via a "loaduser" command in a HAL file for a trial.
-In most cases the index-enable pins will have been used by the GUI started by
-the linuxcnc command.
-
 .SH "SEE ALSO"
 .P
 

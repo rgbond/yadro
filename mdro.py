@@ -49,7 +49,7 @@ class lc():
             if params["verbose"]:
                 print("Linuxcnc interface up")
         except:
-            print("Linuxcnc interface aborted")
+            print("mdro: Linuxcnc interface aborted")
             exit(1)
 
     def poll(self):
@@ -63,7 +63,7 @@ class lc():
 
     def index_ready(self, row):
         pin_name = self.indexes[row]
-        return hal.pin_has_writer("mdro."+pin_name) and self.h[pin_name] == 0
+        return self.h[pin_name] == 0
 
     def set_index_enable(self, row):
         pin_name = self.indexes[row]
@@ -232,17 +232,17 @@ class coord_systems():
 
     def preload_cs(self):
         if params["ini"] is None:
-            print("No .ini file specified")
+            print("mdro: No .ini file specified")
             exit(1)
         valid_axes = list("XYZABCUVW")
         for a in params["axes"]:
             if not (a in valid_axes or a.upper() in valid_axes):
-                print('Axes must be one of "XYZABCUVW"')
+                print('mdro: Axes must be one of "XYZABCUVW"')
                 exit(1)
         inifile = linuxcnc.ini(params["ini"])
         var_file = inifile.find("RS274NGC", "PARAMETER_FILE") or None
         if not os.path.isfile(var_file):
-            print("Could not find", var_file)
+            print("mdro: Could not find", var_file)
             exit(1)
         number_to_load = (len(self.coord_sys) - 1)*20
         max_idx = 5221 + number_to_load
@@ -255,7 +255,7 @@ class coord_systems():
                     idx = int(fields[0])
                     v = float(fields[1])
                 except:
-                    print("Invalid parameter file:", var_file)
+                    print("mdro: Invalid parameter file:", var_file)
                     exit(1)
                 if idx >= max_idx:
                     break
@@ -267,7 +267,7 @@ class coord_systems():
             axis_idx[a.lower()] = i
         for i in range(1, len(self.coord_sys)):
             for j, a in enumerate(params["axes"]):
-                self.coords[i][j] = self.vc[(i - 1) * 20 + axis_idx[a]]
+                self.coords[i][j] = -(self.vc[(i - 1) * 20 + axis_idx[a]])
 
 class main_gui():
     def __init__(self, lcnc):
@@ -369,6 +369,7 @@ class main_gui():
     def index_callback(self, row):
         if params["verbose"]:
             print("main_index_callback", row)
+        self.lcnc.poll()
         if self.lcnc.index_ready(row):
             self.lcnc.set_index_enable(row)
         else:
