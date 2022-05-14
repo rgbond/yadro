@@ -1,18 +1,16 @@
 #!/usr/bin/python3
 #
-# Copyright 2021 Robert Bond
+# Copyright (c) 2022  Robert Bond
 #
-#    Licensed under the Apache License, Version 2.0 (the "License");
-#    you may not use this file except in compliance with the License.
-#    You may obtain a copy of the License at
+# Mdro is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 2 of the License, or
+# (at your option) any later version.
 #
-#        http://www.apache.org/licenses/LICENSE-2.0
-#
-#    Unless required by applicable law or agreed to in writing, software
-#    distributed under the License is distributed on an "AS IS" BASIS,
-#    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-#    See the License for the specific language governing permissions and
-#    limitations under the License.
+# Mdro is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
 #
 # Manual DRO
 # Hook this one directly to the dro pins
@@ -198,14 +196,14 @@ class coord_systems():
         self.callback = callback
         self.rb_var = tk.IntVar()
         self.rb_var.set(1)
-        if params["is_display"] and params["preload"]:
+        if not params["preload"] is None:
             self.coord_sys = ['mcs', 'g54', 'g55', 'g56', 'g57']
         else:
             self.coord_sys = ['mcs', 'cs1', 'cs2', 'cs3', 'cs4']
         self.coords = []
         for i in range(len(self.coord_sys)):
             self.coords.append([0.0]*params["naxes"])
-        if params["preload"]:
+        if not params["preload"] is None:
             self.preload_cs()
         self.cur_idx = 1
         self.cur_sys = self.coords[self.cur_idx]
@@ -231,23 +229,18 @@ class coord_systems():
         self.last_units_factor = units_factor
 
     def preload_cs(self):
-        if params["ini"] is None:
-            print("mdro: No .ini file specified")
-            exit(1)
         valid_axes = list("XYZABCUVW")
         for a in params["axes"]:
             if not (a in valid_axes or a.upper() in valid_axes):
                 print('mdro: Axes must be one of "XYZABCUVW"')
                 exit(1)
-        inifile = linuxcnc.ini(params["ini"])
-        var_file = inifile.find("RS274NGC", "PARAMETER_FILE") or None
-        if not os.path.isfile(var_file):
-            print("mdro: Could not find", var_file)
+        if not os.path.isfile(params["preload"]):
+            print("mdro: Could not find", params["preload"])
             exit(1)
         number_to_load = (len(self.coord_sys) - 1)*20
         max_idx = 5221 + number_to_load
         self.vc = [0.0] * number_to_load
-        with open(var_file, 'r') as f:
+        with open(params["preload"], 'r') as f:
             for line in f:
                 line = line.strip()
                 fields = line.split()
@@ -375,7 +368,7 @@ class main_gui():
         else:
             if params["verbose"]:
                 print("index seq not ready", row)
-        
+
     def poll(self):
         self.lcnc.poll()
         pins = self.lcnc.get_pins()
@@ -389,10 +382,12 @@ class main_gui():
 
 def run_postgui():
     # Run the postgui hal files if called from DISPLAY section of .ini file
+    if params["ini"] is None or params["inifile"] is None:
+        print("mdro inifile missing!")
+        exit(1)
     if params["verbose"]:
         print("mdro ini file: ", params["ini"])
-    inifile = linuxcnc.ini(params["ini"])
-    postgui_halfiles = inifile.findall("HAL", "POSTGUI_HALFILE") or None
+    postgui_halfiles = params["inifile"].findall("HAL", "POSTGUI_HALFILE") or None
     if not postgui_halfiles is None:
         for f in postgui_halfiles:
             if params["verbose"]:
@@ -410,6 +405,56 @@ def call_polls():
     gui.poll()
     root.after(100, call_polls);
 
+def get_params(args):
+    params = dict()
+    params["verbose"] = False
+    params["very_verbose"] = False
+    if args.verbose > 0:
+        params["verbose"] = True
+    if args.verbose > 1:
+        params["very_verbose"] = True
+    params["is_display"] = not args.ini is None
+    params["ini"] = args.ini
+    if not args.ini is None:
+        inifile = linuxcnc.ini(params["ini"])
+        params["inifile"] = inifile
+    options = [
+        ["GEOMETRY", args.axes, "axes"],
+        ["MDRO_VAR_FILE", args.load_cs, "preload"],
+        ["POINT_SIZE", args.point_size, "point_size"],
+        ["MM", args.mm, "mm"]
+    ]
+    if params["ini"] is None:
+        for d, a, p in options:
+            params[p] = a
+    else:
+        for d, a, p in options:
+            params[p] = a
+            dv = inifile.find("DISPLAY", d) or None
+            if params["verbose"]:
+                print("get_params", d, a, p, dv)
+            if not dv is None:
+                params[p] = dv
+
+    params["axes"] = list(params["axes"])
+    params["naxes"] = len(params["axes"])
+
+    params["mm"] = int(params["mm"])
+    if params["mm"] < 0 or params["mm"] > 1:
+        print("MM argument must be 0 or 1")
+        exit(1)
+
+    try:
+        params["point_size"] = int(params["point_size"])
+    except:
+        print("Point size must be an integer")
+    params["font1"] = ("Helvetica", params["point_size"])
+    params["font2"] = ("Helvetica", int(params["point_size"] / 2))
+    params["inch_format"] = "{:.4f}"
+    params["mm_format"] = "{:.2f}"
+
+    return params
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--verbose', '-v', action='count', default=0,
@@ -418,33 +463,14 @@ if __name__ == '__main__':
                     default=20, help='font point size, default: 20')
     parser.add_argument('--mm', '-m', action='store_const', const=1, default=0,
                     help='dro values in mm')
-    parser.add_argument("--load_cs", "-l", action='store_true',
+    parser.add_argument("--load_cs", "-l", type=str,
                     help="load g5x coordinate system")
     parser.add_argument("--ini", "-ini", type=str, help="ini file name")
     parser.add_argument("axes", nargs='?', type=str, default='XYZ',
                     help="Axes (example: XYZ)")
 
     args = parser.parse_args()
-
-    axes = list(args.axes)
-
-    params = {}
-    params["naxes"] = len(axes)
-    params["axes"] = axes
-    params["preload"] = args.load_cs
-    params["is_display"] = not args.ini is None
-    params["ini"] = args.ini
-    params["verbose"] = False
-    params["very_verbose"] = False
-    if args.verbose > 0:
-        params["verbose"] = True
-    if args.verbose > 1:
-        params["very_verbose"] = True
-    params["mm"] = args.mm
-    params["font1"] = ("Helvetica", args.point_size)
-    params["font2"] = ("Helvetica", int(args.point_size / 2))
-    params["inch_format"] = "{:.4f}"
-    params["mm_format"] = "{:.2f}"
+    params = get_params(args)
 
     lcnc = lc()
 
